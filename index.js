@@ -7,7 +7,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const cookieParser = require('cookie-parser');
-console.log("MONGO_URI:", process.env.MONGO_URI);
+
 
 const { normalizeProducts } = require('./utils/normalizeProducts');
 
