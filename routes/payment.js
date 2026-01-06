@@ -5,6 +5,12 @@ const crypto = require("crypto");
 const { protect } = require("../middleware/authMiddleware");
 const Order = require("../models/order");
 
+// ✅ Initialize Razorpay securely
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
 // ✅ Create Razorpay order (secure, DB-driven)
 router.post("/order", protect, async (req, res) => {
   try {
@@ -17,6 +23,10 @@ router.post("/order", protect, async (req, res) => {
     const dbOrder = await Order.findById(orderId);
     if (!dbOrder) {
       return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (dbOrder.isPaid) {
+      return res.status(400).json({ message: "Order already paid" });
     }
 
     const options = {
@@ -34,46 +44,6 @@ router.post("/order", protect, async (req, res) => {
   } catch (err) {
     console.error("❌ Razorpay order error:", err);
     res.status(500).json({ message: "Failed to create Razorpay order" });
-  }
-});
-
-// ✅ Initialize Razorpay securely
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
-
-// @desc Create Razorpay order (secure)
-router.post("/create-order", protect, async (req, res) => {
-  try {
-    const { orderId } = req.body;
-
-    if (!orderId) {
-      return res.status(400).json({ message: "Order ID is required" });
-    }
-
-    // ✅ Double-check that order exists in DB
-    const dbOrder = await Order.findById(orderId);
-    if (!dbOrder) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    // ✅ Ensure the amount matches backend’s order total
-    const options = {
-      amount: dbOrder.totalPrice * 100, // 🔐 SERVER PRICE (paise)
-      currency: "INR",
-      receipt: `order_rcptid_${dbOrder._id}_${Date.now()}`,
-      notes: {
-        orderId: dbOrder._id.toString(),
-        userId: req.user._id.toString(),
-      },
-    };
-
-    const razorpayOrder = await razorpay.orders.create(options);
-    res.json({ order: razorpayOrder });
-  } catch (err) {
-    console.error("❌ Razorpay order error:", err);
-    res.status(500).json({ message: "Failed to create payment order" });
   }
 });
 
