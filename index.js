@@ -15,7 +15,7 @@ const { normalizeProducts } = require('./utils/normalizeProducts');
 app.use(cors({
   origin: [
     "http://localhost:3000",
-    "https://luxor-frontend-knv3.vercel.app"
+    "https://luxor-frontend-weld.vercel.app"
   ],
   credentials: true
 }));
