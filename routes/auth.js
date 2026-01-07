@@ -178,23 +178,35 @@ router.post('/logout', (req, res) => {
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   try {
+    console.log("📨 Forgot-password hit for:", email);
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      console.log("❌ Forgot-password: user not found");
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     const resetExpires = Date.now() + 10 * 60 * 1000;
 
-    // Save OTP and expiry on the user
     user.resetCode = resetCode;
     user.resetExpires = resetExpires;
     await user.save();
 
-    await sendEmail({
-      to: email,
-      subject: 'Luxor Password Reset Code',
-      text: `Your password reset code is: ${resetCode}`,
-    });
+    console.log("📤 Sending reset OTP email to:", email);
 
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Luxor Password Reset Code',
+        text: `Your password reset code is: ${resetCode}`,
+      });
+    } catch (mailErr) {
+      console.error("❌ Email sending failed:", mailErr.message);
+      return res.status(500).json({ message: 'Email service failed' });
+    }
+
+    console.log("✅ Reset OTP sent successfully");
     res.json({ message: 'Reset code sent to email' });
   } catch (err) {
     console.error('❌ Error in /forgot-password:', err);
