@@ -13,11 +13,19 @@ const { normalizeProducts } = require('./utils/normalizeProducts');
 
 // Middlewares
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://luxor-frontend-weld.vercel.app"
-  ],
-  credentials: true
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "https://luxor-frontend-weld.vercel.app"
+    ];
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
 }));
 app.use(express.json());
 app.use(cookieParser());
