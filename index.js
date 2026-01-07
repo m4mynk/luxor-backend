@@ -15,8 +15,9 @@ const { normalizeProducts } = require('./utils/normalizeProducts');
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
-      "http://localhost:3000",
-      "https://luxor-frontend-weld.vercel.app"
+          "http://localhost:3000",
+    "https://luxorclothings.online",
+    "https://www.luxorclothings.online"
     ];
 
     if (!origin || allowedOrigins.includes(origin)) {
