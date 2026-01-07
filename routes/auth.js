@@ -176,7 +176,20 @@ router.post('/logout', (req, res) => {
 
 // ✅ Forgot Password - Send OTP
 router.post('/forgot-password', async (req, res) => {
-  const { email } = req.body;
+  let email = req.body?.email;
+
+  if (!email || typeof email !== "string") {
+    return res.status(400).json({ message: "Valid email is required" });
+  }
+
+  email = email.trim().toLowerCase();
+
+  // ❌ Block accidental frontend URL being sent as email
+  if (email.startsWith("http")) {
+    console.error("❌ Invalid email payload received:", email);
+    return res.status(400).json({ message: "Invalid email value" });
+  }
+
   try {
     console.log("📨 Forgot-password hit for:", email);
 
