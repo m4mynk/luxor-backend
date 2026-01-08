@@ -1,42 +1,24 @@
-const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
 
-const resend =
-  process.env.NODE_ENV === "production"
-    ? new Resend(process.env.RESEND_API_KEY)
-    : null;
+if (!process.env.RESEND_API_KEY) {
+  throw new Error("❌ RESEND_API_KEY is missing in environment variables");
+}
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async ({ to, subject, text }) => {
-  // 🧪 LOCALHOST → Gmail SMTP
-  if (process.env.NODE_ENV !== "production") {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"Luxor" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text,
-    });
-
-    console.log("📧 Email sent via Gmail (dev)");
-    return;
+  if (!to || !subject || !text) {
+    throw new Error("❌ Missing email parameters");
   }
 
-  // 🚀 PRODUCTION → Resend API
-  await resend.emails.send({
-    from: process.env.EMAIL_FROM,
+  const result = await resend.emails.send({
+    from: "Luxor <onboarding@resend.dev>",
     to,
     subject,
     text,
   });
 
-  console.log("📧 Email sent via Resend (prod)");
+  console.log("📧 Email sent via Resend:", result);
 };
 
 module.exports = sendEmail;
