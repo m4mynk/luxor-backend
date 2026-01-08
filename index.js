@@ -16,6 +16,7 @@ app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
           "http://localhost:3000",
+          "https://luxor-frontend-weld.vercel.app",
     "https://luxorclothings.online",
     "https://www.luxorclothings.online"
     ];
