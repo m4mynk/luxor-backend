@@ -16,10 +16,11 @@ const sendToken = (user, res) => {
     { expiresIn: '7d' }
   );
 
-  res.cookie('token', token, {
+  res.cookie("token", token, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'None',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
@@ -169,9 +170,17 @@ router.post('/login', async (req, res) => {
 });
 
 // ✅ Logout
-router.post('/logout', (req, res) => {
-  res.clearCookie('token');
-  res.json({ message: 'Logged out successfully' });
+// LOGOUT
+router.post("/logout", (req, res) => {
+  res.cookie("token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(0),
+  });
+
+  res.status(200).json({ message: "Logged out successfully" });
 });
 
 // ✅ Forgot Password - Send OTP
