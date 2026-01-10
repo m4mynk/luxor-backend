@@ -11,31 +11,21 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// ✅ Create Razorpay order (secure, DB-driven)
+// ✅ Create Razorpay order (accept amount from request, no DB dependency)
 router.post("/order", protect, async (req, res) => {
   try {
-    const { orderId } = req.body;
+    const { amount } = req.body;
 
-    if (!orderId) {
-      return res.status(400).json({ message: "Order ID is required" });
-    }
-
-    const dbOrder = await Order.findById(orderId);
-    if (!dbOrder) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    if (dbOrder.isPaid) {
-      return res.status(400).json({ message: "Order already paid" });
+    if (typeof amount !== "number" || amount <= 0) {
+      return res.status(400).json({ message: "Valid amount is required" });
     }
 
     const options = {
-      amount: dbOrder.totalPrice * 100, // 🔐 server-authoritative
+      amount: amount * 100, // 🔐 server-authoritative
       currency: "INR",
-      receipt: `ord_${dbOrder._id.toString().slice(-8)}`,
+      receipt: `receipt_${Date.now()}`,
       notes: {
-        orderId: dbOrder._id.toString(),
-        userId: req.user._id.toString(),
+        purpose: "checkout",
       },
     };
 
@@ -47,13 +37,29 @@ router.post("/order", protect, async (req, res) => {
   }
 });
 
-// @desc Verify Razorpay payment securely
+// @desc Verify Razorpay payment securely and create Order
 router.post("/verify", protect, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
+    const { 
+      razorpay_order_id, 
+      razorpay_payment_id, 
+      razorpay_signature, 
+      orderItems, 
+      shippingAddress, 
+      totalPrice, 
+      paymentMethod 
+    } = req.body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !orderId) {
-      return res.status(400).json({ message: "Missing payment details" });
+    if (
+      !razorpay_order_id || 
+      !razorpay_payment_id || 
+      !razorpay_signature || 
+      !orderItems || 
+      !shippingAddress || 
+      !totalPrice || 
+      !paymentMethod
+    ) {
+      return res.status(400).json({ message: "Missing payment or order details" });
     }
 
     // ✅ Validate signature
@@ -67,23 +73,25 @@ router.post("/verify", protect, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid payment signature" });
     }
 
-    // ✅ Fetch order and mark as paid
-    const dbOrder = await Order.findById(orderId);
-    if (!dbOrder) {
-      return res.status(404).json({ message: "Order not found" });
-    }
+    // ✅ Create new order in DB with payment info
+    const newOrder = new Order({
+      user: req.user._id,
+      orderItems,
+      shippingAddress,
+      paymentMethod,
+      totalPrice,
+      isPaid: true,
+      paidAt: Date.now(),
+      paymentResult: {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+      },
+    });
 
-    dbOrder.isPaid = true;
-    dbOrder.paidAt = Date.now();
-    dbOrder.paymentResult = {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    };
+    const createdOrder = await newOrder.save();
 
-    await dbOrder.save();
-
-    res.json({ success: true, message: "Payment verified successfully", order: dbOrder });
+    res.json({ success: true, message: "Payment verified and order created successfully", order: createdOrder });
   } catch (err) {
     console.error("❌ Razorpay verify error:", err);
     res.status(500).json({ message: "Server error verifying payment" });
