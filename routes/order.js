@@ -25,21 +25,23 @@ router.post('/', protect, async (req, res) => {
   }
 
   try {
+    const paymentMethod = req.body.paymentMethod;
+
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 7);
 
     req.body.status = 'Processing';
     req.body.estimatedDelivery = estimatedDelivery;
 
-    if (req.body.paymentMethod === "Online Payment") {
-      // Online payment → order exists but NOT paid yet
+    if (paymentMethod === "Online" || paymentMethod === "Online Payment") {
+      req.body.paymentMethod = "Online";
       req.body.isPaid = false;
       req.body.paymentStatus = "pending";
       req.body.paidAt = undefined;
     }
 
-    if (req.body.paymentMethod === "Cash on Delivery") {
-      // COD → payment happens on delivery, NOT now
+    if (paymentMethod === "COD" || paymentMethod === "Cash on Delivery") {
+      req.body.paymentMethod = "COD";
       req.body.isPaid = false;
       req.body.paymentStatus = "cod";
       req.body.paidAt = undefined;
