@@ -31,6 +31,30 @@ router.post('/', protect, async (req, res) => {
     req.body.status = 'Processing';
     req.body.estimatedDelivery = estimatedDelivery;
 
+    if (req.body.paymentMethod === "Online Payment") {
+      // Online payment → order exists but NOT paid yet
+      req.body.isPaid = false;
+      req.body.paymentStatus = "pending";
+      req.body.paidAt = undefined;
+    }
+
+    if (req.body.paymentMethod === "Cash on Delivery") {
+      // COD → payment happens on delivery, NOT now
+      req.body.isPaid = false;
+      req.body.paymentStatus = "cod";
+      req.body.paidAt = undefined;
+    }
+
+    // ❌ Block invalid online-payment orders
+    if (
+      req.body.paymentMethod === "Online Payment" &&
+      (!req.body.totalPrice || Number(req.body.totalPrice) <= 0)
+    ) {
+      return res.status(400).json({
+        message: "Invalid order amount. Online payment requires a valid total.",
+      });
+    }
+
     // ✅ create order directly
     const order = await createOrder(req, res);
 
@@ -63,7 +87,9 @@ router.get('/myorders', protect, getMyOrders);
 // Get all orders (admin only)
 router.get('/', protect, adminMiddleware, async (req, res) => {
   try {
-    const orders = await Order.find({}).populate('user', 'name email');
+    const orders = await Order.find({})
+      .populate('user', 'name email')
+      .select('+paymentStatus +paymentMethod +isPaid');
     res.json(orders);
   } catch (err) {
     console.error(err);
@@ -88,6 +114,10 @@ router.put("/:id/cancel", protect, async (req, res) => {
     // Only allow cancelling if still processing
     if (order.status !== "Processing") {
       return res.status(400).json({ message: "Order cannot be cancelled at this stage" });
+    }
+
+    if (order.paymentMethod === "Online Payment" && order.paymentStatus === "pending") {
+      order.paymentStatus = "failed";
     }
 
     order.status = "Cancelled";
@@ -117,7 +147,10 @@ router.get('/status/:status', protect, adminMiddleware, async (req, res) => {
 router.get('/analytics/summary', protect, adminMiddleware, async (req, res) => {
   try {
     const totalOrders = await Order.countDocuments();
-    const totalRevenueAgg = await Order.aggregate([{ $group: { _id: null, total: { $sum: "$totalPrice" } } }]);
+    const totalRevenueAgg = await Order.aggregate([
+      { $match: { paymentStatus: "paid" } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+    ]);
     const totalRevenue = totalRevenueAgg[0]?.total || 0;
     const totalCustomers = await Order.distinct("user").then(users => users.length);
 
