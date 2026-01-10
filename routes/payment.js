@@ -11,21 +11,35 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// ✅ Create Razorpay order (accept amount from request, no DB dependency)
+// ✅ Create Razorpay order (DB-driven, authoritative)
 router.post("/order", protect, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { orderId } = req.body;
 
-    if (typeof amount !== "number" || amount <= 0) {
-      return res.status(400).json({ message: "Valid amount is required" });
+    if (!orderId) {
+      return res.status(400).json({ message: "Order ID is required" });
+    }
+
+    const dbOrder = await Order.findById(orderId);
+    if (!dbOrder) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (dbOrder.isPaid) {
+      return res.status(400).json({ message: "Order already paid" });
+    }
+
+    if (!dbOrder.totalPrice || dbOrder.totalPrice <= 0) {
+      return res.status(400).json({ message: "Invalid order amount" });
     }
 
     const options = {
-      amount: amount * 100, // 🔐 server-authoritative
+      amount: Math.round(dbOrder.totalPrice * 100),
       currency: "INR",
-      receipt: `receipt_${Date.now()}`,
+      receipt: `ord_${dbOrder._id.toString().slice(-10)}`,
       notes: {
-        purpose: "checkout",
+        orderId: dbOrder._id.toString(),
+        userId: req.user._id.toString(),
       },
     };
 
