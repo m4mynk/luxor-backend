@@ -223,32 +223,28 @@ if (req.body.imagesByColor) {
   }
 }
 
-    // ✅ Parse variants consistently
-    let variants = [];
-    if (req.body.variants) {
-      let raw = req.body.variants;
-
-      if (!Array.isArray(raw)) {
-        raw = [raw]; // ensure array
-      }
-
-      variants = raw
-  .map((v) => {
+// ✅ Parse variants properly (handles FormData JSON string)
+let variants;
+if (req.body.variants) {
+  if (typeof req.body.variants === "string") {
     try {
-      return typeof v === "string" ? JSON.parse(v) : v;
+      const parsed = JSON.parse(req.body.variants);
+      variants = Array.isArray(parsed) ? parsed : [parsed];
     } catch (err) {
-      console.warn("❌ Invalid variant skipped in update:", v);
-      return null;
+      return res.status(400).json({ message: "Invalid variants format" });
     }
-  })
-  .filter(Boolean)
-  .map((v) => ({
+  } else if (Array.isArray(req.body.variants)) {
+    variants = req.body.variants;
+  }
+}
+
+// ✅ Normalize variant fields
+if (variants) {
+  variants = variants.map((v) => ({
     size: v.size,
     color: v.color,
     stock: Number(v.stock) || 0,
   }));
-
-  
 }
 
     // ✅ Handle uploaded file
